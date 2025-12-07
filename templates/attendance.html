@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Take Attendance</h2>
+<label for="att-date">Date</label>
+<input type="date" id="att-date" value="{{ (datetime.utcnow().date()).isoformat() if False else '' }}">
+<button id="load-students">Load Students</button>
+<form id="attendance-form">
+  <div id="students-list"></div>
+  <button type="submit">Save Attendance</button>
+</form>
+<hr>
+<h3>View / Export</h3>
+<label for="view-date">Date</label>
+<input type="date" id="view-date">
+<button id="view-btn">View</button>
+<button id="export-btn">Export CSV</button>
+<div id="view-results"></div>
+<script>
+async function loadForDate(d){
+  const res = await fetch('/api/students');
+  const students = await res.json();
+  const container = document.getElementById('students-list');
+  container.innerHTML = '';
+  students.forEach(s=>{
+    const div = document.createElement('div');
+    div.innerHTML = `<label>${s.roll_no} - ${s.name}
+      <select name="status" data-id="${s.id}">
+        <option value="Present">Present</option>
+        <option value="Absent">Absent</option>
+      </select>
+    </label>`;
+    container.appendChild(div);
+  });
+}
+document.getElementById('load-students').addEventListener('click', ()=> {
+  loadForDate();
+});
+document.getElementById('attendance-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const date = document.getElementById('att-date').value;
+  if (!date){ alert('pick a date'); return; }
+  const selects = Array.from(document.querySelectorAll('#students-list select'));
+  const entries = selects.map(s=>({student_id: s.dataset.id, status: s.value}));
+  const res = await fetch('/api/attendance', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({date, entries})});
+  if (res.ok){ alert('saved'); } else { const err = await res.json(); alert(err.error || 'error'); }
+});
+document.getElementById('view-btn').addEventListener('click', async ()=>{
+  const date = document.getElementById('view-date').value;
+  if (!date){ alert('pick a date'); return; }
+  const res = await fetch(`/api/attendance?date=${date}`);
+  const arr = await res.json();
+  const out = document.getElementById('view-results');
+  if (!arr.length){ out.innerText = 'No records'; return; }
+  out.innerHTML = '<table><thead><tr><th>Roll No</th><th>Name</th><th>Status</th></tr></thead><tbody></tbody></table>';
+  const tbody = out.querySelector('tbody');
+  // we need student names for each record - fetch students
+  const students = await (await fetch('/api/students')).json();
+  const map = {};
+  students.forEach(s=> map[s.id]=s);
+  arr.forEach(r=>{
+    const tr = document.createElement('tr');
+    const s = map[r.student_id] || {roll_no:'?', name:'?'};
+    tr.innerHTML = `<td>${s.roll_no}</td><td>${s.name}</td><td>${r.status}</td>`;
+    tbody.appendChild(tr);
+  });
+});
+document.getElementById('export-btn').addEventListener('click', ()=>{
+  const date = document.getElementById('view-date').value;
+  if (!date){ alert('pick a date'); return; }
+  window.location = `/attendance/export?date=${date}`;
+});
+</script>
+{% endblock %}

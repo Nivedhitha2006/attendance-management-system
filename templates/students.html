@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Students</h2>
+<form id="add-student-form">
+  <input name="roll_no" placeholder="Roll No (e.g. S004)" required>
+  <input name="name" placeholder="Full name" required>
+  <button type="submit">Add Student</button>
+</form>
+<hr>
+<table id="students-table">
+  <thead><tr><th>Roll No</th><th>Name</th></tr></thead>
+  <tbody></tbody>
+</table>
+<script>
+async function loadStudents(){
+  const res = await fetch('/api/students');
+  const arr = await res.json();
+  const tbody = document.querySelector('#students-table tbody');
+  tbody.innerHTML = '';
+  arr.forEach(s=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${s.roll_no}</td><td>${s.name}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById('add-student-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const f = e.target;
+  const data = {roll_no: f.roll_no.value.trim(), name: f.name.value.trim()};
+  const res = await fetch('/api/students', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+  if (res.ok){ f.reset(); loadStudents(); } else { const err = await res.json(); alert(err.error || 'error'); }
+});
+loadStudents();
+</script>
+{% endblock %}
